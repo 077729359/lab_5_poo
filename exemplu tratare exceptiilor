@@ -1,0 +1,206 @@
+#include <iostream>
+#include <fstream>
+#include <stdexcept>
+#include <string>
+#include <ctime>
+#include <unordered_set>
+
+using namespace std;
+
+// === Funcții auxiliare ===
+string obtineTimpCurent() {
+    time_t acum = time(nullptr);
+    tm* timpLocal = localtime(&acum);
+    char buffer[80];
+    strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", timpLocal);
+    return string(buffer);
+}
+
+void logEroare(const string& tip, const string& mesaj) {
+    ofstream file("error_log.txt", ios::app);
+    if (file.is_open()) {
+        file << "[" << obtineTimpCurent() << "] Tip excepție: " << tip << ", Detalii: " << mesaj << endl;
+        file.close();
+    } else {
+        cerr << "Eroare: Nu s-a putut deschide fișierul error_log.txt" << endl;
+    }
+}
+
+// === Clase de excepții ===
+
+// 1. Excepții pentru validarea produselor
+class ExceptiePretInvalid : public exception {
+    string mesaj;
+public:
+    explicit ExceptiePretInvalid(const string& produs) {
+        mesaj = "Prețul introdus pentru produsul \"" + produs + "\" este invalid.";
+    }
+    const char* what() const noexcept override { return mesaj.c_str(); }
+};
+
+class ExceptieCantitateInvalida : public exception {
+    string mesaj;
+public:
+    explicit ExceptieCantitateInvalida(const string& produs) {
+        mesaj = "Cantitatea introdusă pentru produsul \"" + produs + "\" este invalidă.";
+    }
+    const char* what() const noexcept override { return mesaj.c_str(); }
+};
+
+// 2. Excepții pentru stocul de produse
+class ExceptieStocInsuficient : public exception {
+    string mesaj;
+public:
+    ExceptieStocInsuficient(const string& produs, int cantitateCeruta, int stocDisponibil) {
+        mesaj = "Stoc insuficient pentru produsul \"" + produs + "\". Cerut: " + to_string(cantitateCeruta)
+                + ", Disponibil: " + to_string(stocDisponibil) + ".";
+    }
+    const char* what() const noexcept override { return mesaj.c_str(); }
+};
+
+// 3. Excepții pentru codurile de reducere și cardurile de fidelitate
+class ExceptieCodInvalid : public exception {
+    string mesaj;
+public:
+    explicit ExceptieCodInvalid(const string& cod) {
+        mesaj = "Codul de reducere \"" + cod + "\" nu este valid.";
+    }
+    const char* what() const noexcept override { return mesaj.c_str(); }
+};
+
+class ExceptieClientNeeligibil : public exception {
+    string mesaj;
+public:
+    explicit ExceptieClientNeeligibil(const string& motiv) {
+        mesaj = "Clientul nu este eligibil: " + motiv;
+    }
+    const char* what() const noexcept override { return mesaj.c_str(); }
+};
+
+// 4. Excepții la calcularea totalului comenzii
+class ExceptieDiscountInvalid : public exception {
+    string mesaj;
+public:
+    explicit ExceptieDiscountInvalid() {
+        mesaj = "Reducerea aplicată duce la un total negativ sau zero.";
+    }
+    const char* what() const noexcept override { return mesaj.c_str(); }
+};
+
+// 5. Excepții în cadrul procesului de plată
+class ExceptiePlataInvalida : public exception {
+    string mesaj;
+public:
+    explicit ExceptiePlataInvalida(const string& detalii) {
+        mesaj = "Informațiile de plată sunt invalide: " + detalii;
+    }
+    const char* what() const noexcept override { return mesaj.c_str(); }
+};
+
+// === Clase principale ===
+
+class Produs {
+private:
+    string nume;
+    double pret;
+    int cantitate;
+public:
+    Produs(const string& nume, double pret, int cantitate) {
+        if (pret <= 0) {
+            logEroare("ExceptiePretInvalid", "Preț invalid pentru produsul \"" + nume + "\".");
+            throw ExceptiePretInvalid(nume);
+        }
+        if (cantitate < 1) {
+            logEroare("ExceptieCantitateInvalida", "Cantitate invalidă pentru produsul \"" + nume + "\".");
+            throw ExceptieCantitateInvalida(nume);
+        }
+        this->nume = nume;
+        this->pret = pret;
+        this->cantitate = cantitate;
+    }
+
+    const string& getNume() const { return nume; }
+    double getPret() const { return pret; }
+    int getCantitate() const { return cantitate; }
+
+    void verificaStoc(int cantitateCeruta) {
+        if (cantitateCeruta > cantitate) {
+            logEroare("ExceptieStocInsuficient", "Stoc insuficient pentru produsul \"" + nume + "\".");
+            throw ExceptieStocInsuficient(nume, cantitateCeruta, cantitate);
+        }
+    }
+};
+
+class Comanda {
+private:
+    double total;
+public:
+    Comanda() : total(0) {}
+
+    void aplicaDiscount(double discount) {
+        if (discount >= total) {
+            logEroare("ExceptieDiscountInvalid", "Reducere invalidă aplicată la comandă.");
+            throw ExceptieDiscountInvalid();
+        }
+        total -= discount;
+    }
+
+    void procesarePlata(const string& detaliiCard) {
+        if (detaliiCard.length() != 16 || !isdigit(detaliiCard[0])) {
+            logEroare("ExceptiePlataInvalida", "Card invalid: " + detaliiCard);
+            throw ExceptiePlataInvalida("Numărul cardului este invalid.");
+        }
+    }
+};
+
+// === Funcția principală ===
+
+int main() {
+    try {
+        Produs produs1("Laptop", -2000, 5); // Preț invalid
+    } catch (const exception& e) {
+        cout << e.what() << endl;
+    }
+
+    try {
+        Produs produs2("Mouse", 100, -2); // Cantitate invalidă
+    } catch (const exception& e) {
+        cout << e.what() << endl;
+    }
+
+    try {
+        Produs produs3("Tastatură", 500, 3);
+        produs3.verificaStoc(10); // Stoc insuficient
+    } catch (const exception& e) {
+        cout << e.what() << endl;
+    }
+
+    try {
+        Comanda comanda;
+        comanda.aplicaDiscount(500); // Reducere invalidă
+    } catch (const exception& e) {
+        cout << e.what() << endl;
+    }
+
+    try {
+        Comanda comanda;
+        comanda.procesarePlata("123456789012345"); // Card invalid
+    } catch (const exception& e) {
+        cout << e.what() << endl;
+    }
+
+    try {
+        throw ExceptieCodInvalid("ABC1234"); // Cod de reducere invalid
+    } catch (const exception& e) {
+        cout << e.what() << endl;
+    }
+
+    try {
+        throw ExceptieClientNeeligibil("Clientul nu are card de fidelitate activ."); // Client neeligibil
+    } catch (const exception& e) {
+        cout << e.what() << endl;
+    }
+
+    cout << "Programul continuă să ruleze." << endl;
+    return 0;
+}

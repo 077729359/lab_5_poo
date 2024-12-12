@@ -4,59 +4,77 @@
 #include <string>
 #include <iomanip>
 #include <sstream>
-#include <ctime>
-#include <unordered_set>
-#include <stdexcept>
-
 
 using namespace std;
-
 string obtineTimpCurent() {
     time_t acum = time(nullptr);
     tm* timpLocal = localtime(&acum);
     char buffer[80];
     strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", timpLocal);
     return string(buffer);
-}; void logEroare(const string& tip, const string& mesaj) {
+};
+void logEroare(const string& tip, const string& mesaj) {
     ofstream file("error_log.txt", ios::app);
     if (file.is_open()) {
         file << "[" << obtineTimpCurent() << "] Tip excepție: " << tip << ", Detalii: " << mesaj << endl;
         file.close();
     } else {
-        cerr << "Eroare: Nu s-a putut deschide fișierul error_log.txt" << endl;
+        cout << "Eroare: Nu s-a putut deschide fișierul error_log.txt" << endl;
     }
 };
 
+class ExceptieProdusInvalid : public exception {
+public:
+    explicit ExceptieProdusInvalid(const string& mesaj) : mesaj_(mesaj) {}
+    const char* what() const noexcept override {
+        return mesaj_.c_str();
+    }
 
-class ExceptiePretInvalid : public exception {
-    string mesaj;
-public:
-    explicit ExceptiePretInvalid(const string& produs) {
-        mesaj = "Prețul introdus pentru produsul \"" + produs + "\" este invalid.";
-    }
-    const char* what() const noexcept override { return mesaj.c_str(); }
-};
-class ExceptieCantitateInvalida : public exception {
-    string mesaj;
-public:
-    explicit ExceptieCantitateInvalida(const string& produs) {
-        mesaj = "Cantitatea introdusă pentru produsul \"" + produs + "\" este invalidă.";
-    }
-    const char* what() const noexcept override { return mesaj.c_str(); }
+private:
+    string mesaj_;
 };
 class ExceptieStocInsuficient : public exception {
-    string mesaj;
 public:
-    ExceptieStocInsuficient(const string& produs, int cantitateCeruta, int stocDisponibil) {
-        mesaj = "Stoc insuficient pentru produsul \"" + produs + "\". Cerut: " + to_string(cantitateCeruta)
-                + ", Disponibil: " + to_string(stocDisponibil) + ".";
+    explicit ExceptieStocInsuficient(const string& mesaj) : mesaj_(mesaj) {}
+    const char* what() const noexcept override {
+        return mesaj_.c_str();
     }
-    const char* what() const noexcept override { return mesaj.c_str(); }
+
+private:
+    string mesaj_;
 };
-class InvalidInputException : public runtime_error {
+class ExceptieCodInvalid : public exception {
 public:
-    InvalidInputException(const string& message) : runtime_error(message) {}
+    explicit ExceptieCodInvalid(const string& mesaj) : mesaj_(mesaj) {}
+    const char* what() const noexcept override {
+        return mesaj_.c_str();
+    }
+
+private:
+    string mesaj_;
 };
+class ExceptieClientNeeligibil : public exception {
+public:
+    explicit ExceptieClientNeeligibil(const string& mesaj) : mesaj_(mesaj) {}
+    const char* what() const noexcept override {
+        return mesaj_.c_str();
+    }
+
+private:
+    string mesaj_;
+};
+class ExceptiePlataInvalida : public exception {
+public:
+    explicit ExceptiePlataInvalida(const string& mesaj) : mesaj_(mesaj) {}
+    const char* what() const noexcept override {
+        return mesaj_.c_str();
+    }
+
+private:
+    string mesaj_;
+};
+
+
 
 class Product {
 protected:
@@ -64,20 +82,10 @@ protected:
     int stock;
 
 public:
+
     double price;
-
-    // Constructor implicit
-    Product() : price(0), stock(0) {}
-
-    // Constructor parametrizat
-    Product(string name, double price, int stock) : name(name), price(price), stock(stock) {
-        if (price <= 0) {
-            throw ExceptiePretInvalid(name);
-        }
-        if (stock < 0) {
-            throw ExceptieCantitateInvalida(name);
-        }
-    }
+    Product() {}
+    Product(string name, double price, int stock) : name(name), price(price), stock(stock) {}
 
     string getName() const { return name; }
     int getStock() const { return stock; }
@@ -89,19 +97,14 @@ public:
 
     // Operator overloading -= pentru scăderea stocului unui produs
     void operator-=(int quantity) {
-        if (quantity <= 0) {
-            throw ExceptieCantitateInvalida(name);
-        }
-        if (stock < quantity) {
-            throw ExceptieStocInsuficient(name, quantity, stock);
-        }
-        stock -= quantity;
+        stock = (stock >= quantity) ? stock - quantity : 0;
     }
 
 
     virtual void display() = 0;
     virtual void displayWithoutStock() = 0;
     virtual bool isInStock(int quantity) = 0;
+
 
     virtual ~Product() {}
     friend class Cart;
@@ -168,161 +171,123 @@ public:
     friend class Cart;
 };
 
-class CartItem {
+class CartItem{
 public:
     Product* product;
     int quantity;
+    CartItem() : product(nullptr), quantity(0) {};
+    CartItem(Product* product, int quantity) : product(product), quantity(quantity) {};
+    CartItem(const CartItem& other) : product(other.product), quantity(other.quantity) {};
 
-    CartItem() : product(nullptr), quantity(0) {}
-    CartItem(Product* product, int quantity) : product(product), quantity(quantity) {}
-    CartItem(const CartItem& other) : product(other.product), quantity(other.quantity) {}
+     void addTableLampsToCart(vector<TableLamp>& tableLamps) {
 
-    void addTableLampsToCart(vector<TableLamp>& tableLamps) {
-        try {
-            tableLamps.push_back(TableLamp("Veioza_Modern", 299.99, 10));
-            tableLamps.push_back(TableLamp("Veioza_Clasic", 249.99, 10));
-            tableLamps.push_back(TableLamp("Veioza_Birou_LED", 399.99, 10));
-            tableLamps.push_back(TableLamp("Veioza_Vintage", 349.99, 10));
-            tableLamps.push_back(TableLamp("Veioza_Smart", 499.99, 10));
-            tableLamps.push_back(TableLamp("Veioza_Copii", 199.99, 10));
-            tableLamps.push_back(TableLamp("Veioza_Dormitor", 279.99, 10));
-            tableLamps.push_back(TableLamp("Veioza_Studio", 329.99, 10));
-            tableLamps.push_back(TableLamp("Veioza_Artistica", 449.99, 10));
-            tableLamps.push_back(TableLamp("Veioza_Minimalist", 289.99, 10));
-        } catch (const ExceptieStocInsuficient& e) {
-            cout << "Eroare la adăugarea veiozelor în coș: " << e.what() << endl;
-        } catch (const ExceptieCantitateInvalida& e) {
-            cout << "Eroare la adăugarea veiozelor în coș: " << e.what() << endl;
-        }
-    }
+        tableLamps.push_back(TableLamp("Veioza_Modern", 299.99, 10)),
+        tableLamps.push_back(TableLamp("Veioza_Clasic", 249.99, 10)),
+        tableLamps.push_back(TableLamp("Veioza_Birou_LED", 399.99, 10)),
+        tableLamps.push_back(TableLamp("Veioza_Vintage", 349.99, 10)),
+        tableLamps.push_back(TableLamp("Veioza_Smart", 499.99, 10)),
+        tableLamps.push_back(TableLamp("Veioza_Copii", 199.99, 10)),
+        tableLamps.push_back(TableLamp("Veioza_Dormitor", 279.99, 10)),
+        tableLamps.push_back(TableLamp("Veioza_Studio", 329.99, 10)),
+        tableLamps.push_back(TableLamp("Veioza_Artistica", 449.99, 10)),
+        tableLamps.push_back(TableLamp("Veioza_Minimalist", 289.99, 10));
+    };
 
     void addCeilingLampsToCart(vector<CeilingLamp>& ceilingLamps) {
-        try {
-            ceilingLamps.push_back(CeilingLamp("Lustra_Cristal", 999.99, 10));
-            ceilingLamps.push_back(CeilingLamp("Lustra_Moderna", 799.99, 10));
-            ceilingLamps.push_back(CeilingLamp("Candelabru_Elegant", 1299.99, 10));
-            ceilingLamps.push_back(CeilingLamp("Plafoniera_LED", 599.99, 10));
-            ceilingLamps.push_back(CeilingLamp("Lustra_Industrial", 899.99, 10));
-            ceilingLamps.push_back(CeilingLamp("Lustra_Vintage", 849.99, 10));
-            ceilingLamps.push_back(CeilingLamp("Lustra_Smart", 1199.99, 10));
-            ceilingLamps.push_back(CeilingLamp("Plafoniera_Baie", 399.99, 10));
-            ceilingLamps.push_back(CeilingLamp("Lustra_Living", 949.99, 10));
-            ceilingLamps.push_back(CeilingLamp("Lustra_Minimalist", 699.99, 10));
-        } catch (const ExceptieStocInsuficient& e) {
-            cout << "Eroare la adăugarea lustrelor în coș: " << e.what() << endl;
-        } catch (const ExceptieCantitateInvalida& e) {
-            cout << "Eroare la adăugarea lustrelor în coș: " << e.what() << endl;
-        }
-    }
+
+        ceilingLamps.push_back( CeilingLamp("Lustra_Cristal", 999.99, 10)),
+        ceilingLamps.push_back(CeilingLamp("Lustra_Moderna", 799.99, 10)),
+       ceilingLamps.push_back(CeilingLamp("Candelabru_Elegant", 1299.99, 10)),
+       ceilingLamps.push_back( CeilingLamp("Plafoniera_LED", 599.99, 10)),
+        ceilingLamps.push_back(CeilingLamp("Lustra_Industrial", 899.99, 10)),
+        ceilingLamps.push_back(CeilingLamp("Lustra_Vintage", 849.99, 10)),
+        ceilingLamps.push_back(CeilingLamp("Lustra_Smart", 1199.99, 10)),
+        ceilingLamps.push_back(CeilingLamp("Plafoniera_Baie", 399.99, 10)),
+        ceilingLamps.push_back(CeilingLamp("Lustra_Living", 949.99, 10)),
+        ceilingLamps.push_back( CeilingLamp("Lustra_Minimalist", 699.99, 10));
+    };
 
     void addWallLampsToCart(vector<WallLamp>& wallLamps) {
-        try {
-            wallLamps.push_back(WallLamp("Aplica_Moderna", 199.99, 10));
-            wallLamps.push_back(WallLamp("Aplica_LED", 249.99, 10));
-            wallLamps.push_back(WallLamp("Aplica_Clasica", 179.99, 10));
-            wallLamps.push_back(WallLamp("Aplica_Vintage", 229.99, 10));
-            wallLamps.push_back(WallLamp("Aplica_Industrial", 259.99, 10));
-            wallLamps.push_back(WallLamp("Aplica_Exterior", 299.99, 10));
-            wallLamps.push_back(WallLamp("Aplica_Baie", 189.99, 10));
-            wallLamps.push_back(WallLamp("Aplica_Oglinda", 219.99, 10));
-            wallLamps.push_back(WallLamp("Aplica_Smart", 349.99, 10));
-            wallLamps.push_back(WallLamp("Aplica_Minimalist", 209.99, 10));
-        } catch (const ExceptieStocInsuficient& e) {
-            cout << "Eroare la adăugarea aplicei în coș: " << e.what() << endl;
-        } catch (const ExceptieCantitateInvalida& e) {
-            cout << "Eroare la adăugarea aplicei în coș: " << e.what() << endl;
-        }
-    }
+
+        wallLamps.push_back(  WallLamp("Aplica_Moderna", 199.99, 10)),
+        wallLamps.push_back( WallLamp("Aplica_LED", 249.99, 10)),
+       wallLamps.push_back( WallLamp("Aplica_Clasica", 179.99, 10)),
+        wallLamps.push_back( WallLamp("Aplica_Vintage", 229.99, 10)),
+        wallLamps.push_back( WallLamp("Aplica_Industrial", 259.99, 10)),
+        wallLamps.push_back(WallLamp("Aplica_Exterior", 299.99, 10)),
+        wallLamps.push_back(  WallLamp("Aplica_Baie", 189.99, 10)),
+        wallLamps.push_back(WallLamp("Aplica_Oglinda", 219.99, 10)),
+        wallLamps.push_back(WallLamp("Aplica_Smart", 349.99, 10)),
+        wallLamps.push_back(   WallLamp("Aplica_Minimalist", 209.99, 10));
+    };
 };
 
-class Cart : virtual public CartItem {
+class Cart: virtual public CartItem {
     vector<CartItem> items;
     double total;
 
 public:
-    Cart() : total(0.0) {}
+    Cart() : total(0.0) {};
+    Cart(const Cart& other) : items(other.items), total(other.total) {};
 
-    Cart(const Cart& other) : items(other.items), total(other.total) {}
+    // Operator overloading += pentru adaugarea unui produs in cos
+    Cart& operator+=(CartItem item) {
+        bool found = false;
+        for (auto& i : items) {
+            if (*i.product == *item.product) {
+                i.quantity += item.quantity;
+                found = true;
+                break;
 
-    // Operator overloading += pentru adăugarea unui produs în coș
-    Cart& operator+=(const CartItem& item) {
-        try {
-            bool found = false;
-            for (auto& i : items) {
-                if (*i.product == *item.product) {
-                    // Actualizează cantitatea produsului în coș
-                    i.quantity += item.quantity;
-                    found = true;
-                    break;
-                }
-            }
-
-            // Dacă produsul nu este deja în coș, îl adăugăm
-            if (!found) {
-                items.push_back(item);
-            }
-
-            // Actualizează totalul
-            if (item.product != nullptr) {
-                total += item.product->price * item.quantity;
-            } else {
-                throw std::invalid_argument("Produsul nu poate fi adăugat în coș (produs invalid).");
             }
         }
-        catch (const std::exception& e) {
-            std::cerr << "Eroare la adăugarea produsului în coș: " << e.what() << std::endl;
+        if (!found) {
+            items.push_back(item);
         }
+        total += item.product->price * item.quantity;
         return *this;
     }
 
-    // Suprascriere operatorului << pentru a afișa coșul
+
     friend ostream& operator<<(ostream& os, const Cart& cart) {
         os << "\nCosul dumneavoastra:\n";
-        if (cart.items.empty()) {
-            os << "Coșul este gol.\n";
-        } else {
-            for (const auto& item : cart.items) {
-                os << item.quantity << " x ";
-                item.product->displayWithoutStock();
-            }
-            os << "Total: " << fixed << setprecision(2) << cart.total << " lei\n";
+        for (const auto& item : cart.items) {
+            os << item.quantity << " x ";
+            item.product->displayWithoutStock();
         }
+        os << "Total: " << fixed << setprecision(2) << cart.total << " lei\n";
         return os;
     }
 
-    // Returnează totalul coșului
     double getTotal() const {
         return total;
     }
 
-    // Aplică un discount la total
     void applyDiscount(double discount) {
-        if (discount < 0 || discount > 1) {
-            throw std::invalid_argument("Discountul trebuie să fie între 0 și 1.");
-        }
         total *= (1 - discount);
     }
 
-    // Golirea coșului
     void clearCart() {
         items.clear();
         total = 0;
     }
+
 };
 
-class User : virtual public CartItem {
+
+class User: virtual public CartItem {
+
     string name;
     string idnp;
     int visits;
     double totalSpent;
 
 public:
-    User() : name(""), idnp(""), visits(0), totalSpent(0.0) {}
-    User(string name, string idnp) : name(name), idnp(idnp), visits(0), totalSpent(0.0) {}
+    User() : name(""), idnp(""), visits(0), totalSpent(0.0) {};
+    User(string name, string idnp) : name(name), idnp(idnp), visits(0), totalSpent(0.0) {};
     User(const User& other) : name(other.name), idnp(other.idnp),
-                               visits(other.visits), totalSpent(other.totalSpent) {}
+                               visits(other.visits), totalSpent(other.totalSpent) {};
 
-    // Încărcarea datelor din fișierul de utilizatori
     void loadData() {
         ifstream file("users.txt");
         if (file.is_open()) {
@@ -340,47 +305,31 @@ public:
         }
     }
 
-    // Actualizarea datelor utilizatorului în fișier
     void updateData(double cartTotal) {
-        visits++; // Incrementăm numărul de vizite
+        visits++; // Chemarea operatorului supraincarcat ++
         totalSpent += cartTotal;
-
         vector<string> lines;
         ifstream infile("users.txt");
-        string line;
-        bool userExists = false;
-
-        // Citim fișierul și actualizăm datele utilizatorului sau adăugăm un nou utilizator
+        string line; bool userExists = false;
         while (getline(infile, line)) {
             stringstream ss(line);
             string fileIdnp, fileName;
-            int fileVisits;
-            double fileTotalSpent;
+            int fileVisits; double fileTotalSpent;
             ss >> fileIdnp >> fileName >> fileVisits >> fileTotalSpent;
-
             if (fileIdnp == idnp) {
                 line = idnp + " " + name + " " + to_string(visits) + " " + to_string(totalSpent);
                 userExists = true;
             }
-
             lines.push_back(line);
         }
         infile.close();
-
-        // Dacă utilizatorul nu există, îl adăugăm la final
         if (!userExists) {
             line = idnp + " " + name + " " + to_string(visits) + " " + to_string(totalSpent);
             lines.push_back(line);
         }
-
-        // Scriem înapoi toate datele în fișier
         ofstream outfile("users.txt");
-        for (const auto& ln : lines) {
-            outfile << ln << endl;
-        }
+        for (const auto& ln : lines) { outfile << ln << endl; }
         outfile.close();
-
-        // Verificăm dacă utilizatorul este eligibil pentru invitație VIP
         if (totalSpent > 500000) {
             ofstream inviteFile("invitatie.txt");
             inviteFile << "Drag client " << name << ",\n\n"
@@ -390,35 +339,38 @@ public:
             inviteFile.close();
             cout << "\nInvitație VIP generată pentru clientul " << name << ".\n";
         }
-    }
+    };
 
-    // Verificăm dacă utilizatorul este eligibil pentru discount
     bool eligibleForDiscount() const {
-        return totalSpent > 4000 && visits > 5;
-    }
+        if( totalSpent > 4000 && visits > 5) {
+            return 1;
+        } else {
+            return 0;
+        };
+    };
 
-    // Suprascriere operatorului << pentru afișarea datelor despre utilizator
+    // Operator overloading << pentru afisarea datelor despre utilizator
     friend ostream& operator<<(ostream& os, const User& user) {
-        os << "Utilizator: " << user.name << ", IDNP: " << user.idnp
-           << ", Vizite: " << user.visits
+        os << "Utilizator: " << user.name << ", IDNP: " << user.idnp << ", Vizite: " << user.visits
            << ", Total Cheltuit: " << fixed << setprecision(2) << user.totalSpent << " lei";
         return os;
-    }
-
-    // Suprascriere operatorului ++ pentru incrementarea numărului de vizite
+    };
+    // Operator overloading ++ pentru incrementarea numarului de vizite
     User& operator++() {
         visits++;
         return *this;
-    }
+    };
 };
 
-class Executor : public User, public Cart {
+class Executor: public User, public Cart {
 public:
+
     Executor() : User(), Cart() {};
     Executor(string name, string idnp) : User(name, idnp), Cart() {};
     Executor(const Executor& other) : User(other), Cart(other) {};
 
-    void displayMenu() const {
+
+    void displayMenu() {
         cout << "\n--- Meniu Magazin de Lampi Electrice ---\n";
         cout << "1. Vizualizare produse\n";
         cout << "2. Adaugare produs in cos\n";
@@ -428,149 +380,122 @@ public:
         cout << "Selectati o optiune: ";
     };
 
-    bool processPayment(double totalAmount) const {
+    bool processPayment(double totalAmount) {
         string cardNumber, expiryDate, cvv;
+        cout << "Introduceti numarul cardului (16 cifre): ";
+        cin >> cardNumber;
+        cout << "Introduceti data expirarii (LL/AA): ";
+        cin >> expiryDate;
+        cout << "Introduceti CVV: ";
+        cin >> cvv;
 
-        try {
-            cout << "Introduceti numarul cardului (16 cifre): ";
-            cin >> cardNumber;
-            if (cardNumber.length() != 16) {
-                throw InvalidInputException("Numarul de card este invalid. Trebuie sa fie exact 16 cifre.");
-            }
-
-            cout << "Introduceti data expirarii (LL/AA): ";
-            cin >> expiryDate;
-            if (expiryDate.length() != 5) {
-                throw InvalidInputException("Data expirarii este invalida. Formatul corect este LL/AA.");
-            }
-
-            cout << "Introduceti CVV: ";
-            cin >> cvv;
-            if (cvv.length() != 3) {
-                throw InvalidInputException("CVV invalid. Trebuie sa fie exact 3 cifre.");
-            }
-
+        if (cardNumber.length() == 16 && expiryDate.length() == 5 && cvv.length() == 3) {
             cout << "\nPlata de " << fixed << setprecision(2) << totalAmount << " lei efectuata cu succes.\n";
             return true;
-
-        } catch (const InvalidInputException& e) {
-            cout << e.what() << endl;
+        } else {
             return false;
         }
     };
 
-    void displayProductsByCategory(const vector<Product*>& products) const {
+    void displayProductsByCategory(vector<Product*> products) {
         cout << "\nProduse disponibile:\n\n";
 
-        displayCategoryProducts<TableLamp>("VEIOZE", products);
-        displayCategoryProducts<CeilingLamp>("LAMPI DE TAVAN", products);
-        displayCategoryProducts<WallLamp>("LAMPI DE PERETE", products);
-    };
-
-    template<typename T>
-    void displayCategoryProducts(const string& category, const vector<Product*>& products) const {
-        cout << "\n" << category << ":\n";
+        cout << "VEIOZE:\n";
         for (Product* product : products) {
-            if (dynamic_cast<T*>(product)) {
+            if (dynamic_cast<TableLamp*>(product)) {
                 product->display();
             }
         }
+
+        cout << "\nLAMPI DE TAVAN:\n";
+        for (Product* product : products) {
+            if (dynamic_cast<CeilingLamp*>(product)) {
+                product->display();
+            }
+        }
+
+        cout << "\nLAMPI DE PERETE:\n";
+        for (Product* product : products) {
+            if (dynamic_cast<WallLamp*>(product)) {
+                product->display();
+            }
+        }
+    };
+
+
+    void getUserDetails(string& name, string& idnp) {
+        cout << "Introduceti numele: ";
+        getline(cin, name);
+        if (name.empty()) {
+            logEroare("ExceptieClientNeeligibil", "Numele nu a fost introdus!");
+            throw ExceptieClientNeeligibil("Numele nu a fost introdus!");
+        }
+
+        cout << "Introduceti IDNP-ul: ";
+        getline(cin, idnp);
+        if (idnp.empty()) {
+            logEroare("ExceptieClientNeeligibil", "IDNP-ul nu a fost introdus!");
+            throw ExceptieClientNeeligibil("IDNP-ul nu a fost introdus!");
+        }
     }
 
-    void getUserDetails(string& name, string& idnp) const {
-        try {
-            cout << "Introduceti numele: ";
-            getline(cin, name);
-            if (name.empty()) {
-                throw InvalidInputException("Numele nu poate fi gol.");
-            }
+    void handlePromoCode(string& promoCode, bool& promoApplied, Cart& cart) {
+        cout << "Doriti sa introduceti un cod promotional? (da/nu): ";
+        string response;
+        cin >> response;
 
-            cout << "Introduceti IDNP-ul: ";
-            getline(cin, idnp);
-            if (idnp.empty()) {
-                throw InvalidInputException("IDNP-ul nu poate fi gol.");
-            }
+        if (response == "da") {
+            cout << "Introduceti codul promotional: ";
+            cin >> promoCode;
 
-        } catch (const InvalidInputException& e) {
-            cout << e.what() << endl;
+            // Verificăm dacă codul promoțional este valid
+            if (promoCode == "PROMO2024") {
+                cart.applyDiscount(0.03); // aplicăm reducerea de 3%
+                promoApplied = true;
+                cout << "Cod promotional valid! S-a aplicat o reducere de 3%.\n";
+            } else {
+                promoApplied = false;
+                logEroare("ExceptieCodInvalid", "Promocod introdus gresit!");
+                throw ExceptieCodInvalid("Promocod introdus gresit!");
+            }
         }
     };
 
-    void handlePromoCode(string& promoCode, bool& promoApplied, Cart& cart) const {
-        try {
-            cout << "Doriti sa introduceti un cod promotional? (da/nu): ";
-            string response;
-            cin >> response;
-
-            if (response == "da") {
-                cout << "Introduceti codul promotional: ";
-                cin >> promoCode;
-
-                if (promoCode == "PROMO2024") {
-                    cart.applyDiscount(0.03);
-                    promoApplied = true;
-                    cout << "Cod promotional valid! S-a aplicat o reducere de 3%.\n";
-                } else {
-                    throw InvalidInputException("Codul promotional este invalid.");
-                }
-            }
-        } catch (const InvalidInputException& e) {
-            cout << e.what() << endl;
+    Product* validateProductChoice(int choice, const vector<Product*>& products) {
+        if (choice < 1 || choice > products.size()) {
+            logEroare("ExceptieProdusInvalid","Produs cu asa ID nu exista!");
+            throw ExceptieProdusInvalid("Produs cu asa ID nu exista!");
         }
+        return products[choice - 1];
     };
 
-    Product* validateProductChoice(int choice, const vector<Product*>& products) const {
-        try {
-            if (choice < 1 || choice > products.size()) {
-                throw InvalidInputException("Optiune invalida. Alegeti un produs valid.");
-            }
-            return products[choice - 1];
-
-        } catch (const InvalidInputException& e) {
-            cout << e.what() << endl;
-            return nullptr;
+    bool validateQuantity(int quantity) {
+        if (quantity <= 0) {
+            logEroare("ExceptieStocInsuficient","Stoc insuficient pentru acest produs!");
+            throw ExceptieStocInsuficient("Stoc insuficient pentru acest produs!");
+            return 0;
         }
+        return true;
     };
 
-    bool validateQuantity(int quantity) const {
-        try {
-            if (quantity <= 0) {
-                throw InvalidInputException("Cantitatea trebuie sa fie pozitiva.");
-            }
-            return true;
-
-        } catch (const InvalidInputException& e) {
-            cout << e.what() << endl;
+    bool checkStockAndUpdate(Product* product, int quantity) {
+        if (!product->isInStock(quantity)) {
+            logEroare("ExceptieStocInsuficient","Stoc insuficient!");
+            throw ExceptieStocInsuficient("Stoc insuficient!");
             return false;
         }
+        *product -= quantity; // Chemarea operatorului supraincarcat -=
+        return true;
     };
 
-    bool checkStockAndUpdate(Product* product, int quantity) const {
-        try {
-            if (!product->isInStock(quantity)) {
-                throw InvalidInputException("Stoc insuficient pentru produsul ales.");
-            }
-            *product -= quantity; // Chemarea operatorului supraincarcat -=
-            return true;
-
-        } catch (const InvalidInputException& e) {
-            cout << e.what() << endl;
-            return false;
-        }
+    void addToCart(Cart& cart, Product* product, int quantity) {
+        CartItem item(product, quantity);
+        cart += item; // Chemarea operatorului supraincarcat +=
+        cout << "Produsul a fost adaugat in cos.\n";
     };
 
-    void addToCart(Cart& cart, Product* product, int quantity) const {
-        try {
-            CartItem item(product, quantity);
-            cart += item; // Chemarea operatorului supraincarcat +=
-            cout << "Produsul a fost adaugat in cos.\n";
 
-        } catch (const InvalidInputException& e) {
-            cout << e.what() << endl;
-        }
-    };
-
-    bool checkEmptyCart(const Cart& cart) const {
+    bool checkEmptyCart(const Cart& cart) {
         if (cart.getTotal() == 0) {
             cout << "Cosul este gol. Adaugati produse inainte de a finaliza comanda.\n";
             return true;
@@ -578,145 +503,124 @@ public:
         return false;
     };
 
-    void applyDiscounts(Cart& cart, bool discountCard, bool promoApplied) const {
+    void applyDiscounts(Cart& cart, bool discountCard, bool promoApplied) {
+
         if (discountCard && !promoApplied) {
-            cart.applyDiscount(0.15);
+            cart.applyDiscount(0.12);
             cout << "S-a aplicat o reducere de 15% pentru cardul de fidelitate.\n";
         } else if (discountCard && promoApplied) {
             cart.applyDiscount(0.15);
             cout << "S-a aplicat reducerea de 15% pentru cardul de fidelitate (după reducerea promoțională).\n";
-        }
+        } else if(!discountCard && !promoApplied) {
+            cart.applyDiscount(0);
+        };
+
     };
 
-    void finalizeOrder(Cart& cart, User& user) const {
-        try {
-            cout << "Total de plata: " << fixed << setprecision(2) << cart.getTotal() << " lei\n";
+    void finalizeOrder(Cart& cart, User& user) {
+        cout << "Total de plata: " << fixed << setprecision(2) << cart.getTotal() << " lei\n";
 
-            if (processPayment(cart.getTotal())) {
-                user.updateData(cart.getTotal());
-                cout << "Comanda a fost finalizata cu succes.\n";
+        if (processPayment(cart.getTotal())) {
+            user.updateData(cart.getTotal());
+            cout << "Comanda a fost finalizata cu succes.\n";
 
-                if (cart.getTotal() >= 2000) {
-                    cout << "Livrare gratuita! A-ti cumparat la o suma > 2000 lei.\n";
-                }
-
-                cart.clearCart();
-            } else {
-                throw InvalidInputException("Plata a esuat. Incercati din nou.");
+            if (cart.getTotal() >= 2000) {
+                cout << "Livrare gratuita! A-ti cumparat la o suma > 2000 lei.\n";
             }
 
-        } catch (const InvalidInputException& e) {
-            cout << e.what() << endl;
+            cart.clearCart();
+        } else {
+            logEroare("ExceptiePlataInvalida","Date invalide a cardului!");
+            throw ExceptiePlataInvalida("Date invalide a cardului!");
         }
     };
 };
 
-
 int main() {
     Executor execute;
-    vector<TableLamp> tableLamps;
-    vector<CeilingLamp> ceilingLamps;
-    vector<WallLamp> wallLamps;
+    vector<TableLamp> tableLamps; execute.addTableLampsToCart(tableLamps);
+    vector<CeilingLamp> ceilingLamps; execute.addCeilingLampsToCart(ceilingLamps);
+    vector<WallLamp> wallLamps; execute.addWallLampsToCart( wallLamps);
     vector<Product*> products;
-    Cart cart;
+
+    for(auto& lamp : tableLamps) {products.push_back(&lamp); }
+    for(auto& lamp : ceilingLamps) {products.push_back(&lamp); }
+    for(auto& lamp : wallLamps) {products.push_back(&lamp); }
+
     string name, idnp;
 
     try {
-        // Adăugăm lămpile în coș
-        execute.addTableLampsToCart(tableLamps);
-        execute.addCeilingLampsToCart(ceilingLamps);
-        execute.addWallLampsToCart(wallLamps);
-
-        // Adăugăm produsele într-o listă generală
-        for (auto& lamp : tableLamps) {
-            products.push_back(&lamp);
-        }
-        for (auto& lamp : ceilingLamps) {
-            products.push_back(&lamp);
-        }
-        for (auto& lamp : wallLamps) {
-            products.push_back(&lamp);
-        }
-
-        // Obținem detalii utilizator
         execute.getUserDetails(name, idnp);
-        User user(name, idnp);
-        user.loadData();
+    } catch (const ExceptieClientNeeligibil& e) {
+        cout << "\n Eroare: " << e.what();
+        return 0;
+    }
 
-        bool discountCard = user.eligibleForDiscount();
-        if (discountCard) {
-            cout << "Felicitari! Va calificati pentru un card de reducere cu 15% pentru cumparaturile viitoare.\n";
-        }
+    User user(name, idnp); user.loadData();
+    Cart cart;
+    bool discountCard = user.eligibleForDiscount();
+    int option;
 
-        int option;
-        do {
-            execute.displayMenu();
-            cin >> option;
+    do {execute.displayMenu(); cin >> option;
+        switch (option) {
+            case 1:
+                execute.displayProductsByCategory(products); break;
+            case 2: {
+                int choice, quantity;
 
-            if (cin.fail()) {
-                cin.clear();
-                cin.ignore(numeric_limits<streamsize>::max(), '\n');
-                throw InvalidInputException("Input invalid. Va rugam sa introduceti un numar valid.");
-            }
-
-            switch (option) {
-                case 1:
-                    execute.displayProductsByCategory(products);
-                    break;
-                case 2: {
-                    int choice, quantity;
+                try {
                     cout << "Introduceti numarul produsului (1-30): ";
                     cin >> choice;
-                    if (cin.fail()) {
-                        cin.clear();
-                        cin.ignore(numeric_limits<streamsize>::max(), '\n');
-                        throw InvalidInputException("Input invalid. Va rugam sa introduceti un numar valid.");
-                    }
-
                     Product* selectedProduct = execute.validateProductChoice(choice, products);
-                    if (!selectedProduct) break;
+                    if (!selectedProduct) {
+                        cout << "Produsul nu exista!" << endl;
+                        break;
+                    }
 
                     cout << "Introduceti cantitatea: ";
                     cin >> quantity;
-                    if (cin.fail()) {
-                        cin.clear();
-                        cin.ignore(numeric_limits<streamsize>::max(), '\n');
-                        throw InvalidInputException("Input invalid. Va rugam sa introduceti un numar valid.");
-                    }
 
-                    if (!execute.validateQuantity(quantity)) break;
-                    if (!execute.checkStockAndUpdate(selectedProduct, quantity)) break;
+                    execute.validateQuantity(quantity);
+                    execute.checkStockAndUpdate(selectedProduct, quantity);
+
                     execute.addToCart(cart, selectedProduct, quantity);
-                    break;
-                }
-                case 3:
-                    cout << cart;
-                    break;
-                case 4: {
-                    if (execute.checkEmptyCart(cart)) break;
+                    cout << "Produsul a fost adaugat in cos!" << endl;
 
-                    string promoCode;
-                    bool promoApplied = false;
-                    execute.handlePromoCode(promoCode, promoApplied, cart);
-                    execute.applyDiscounts(cart, discountCard, promoApplied);
-                    execute.finalizeOrder(cart, user);
-                    break;
+                } catch (const ExceptieProdusInvalid& e) {
+                    cout << "\n Eroare: " << e.what();
+                } catch (const ExceptieStocInsuficient& e) {
+                   cout << "\n Eroare: " << e.what();
+                } catch (const exception& e) {
+                   cout << "\n Eroare necunoscuta: " << e.what();
                 }
-                case 5:
-                    cout << "Multumim pentru vizita!\n";
-                    break;
-                default:
-                    cout << "Optiune invalida. Va rugam sa selectati o optiune valida.\n";
-                    break;
             }
+            break;
+            case 3:
+                cout << cart; break;
+            case 4: {
+                if (execute.checkEmptyCart(cart)) break;
+                string promoCode; bool promoApplied = false;
 
-        } while (option != 5);
+                try {
+                    execute.handlePromoCode(promoCode, promoApplied, cart);
+                } catch (const ExceptieCodInvalid& e) {
+                    cout << "\n Eroare: " << e.what();
+                }
 
-    } catch (const InvalidInputException& e) {
-        cout << "Eroare: " << e.what() << endl;
-    } catch (const exception& e) {
-        cout << "A aparut o eroare neasteptata: " << e.what() << endl;
-    }
-
+                execute.applyDiscounts(cart, discountCard, promoApplied);
+                try {
+                    execute.finalizeOrder(cart, user);
+                } catch (const ExceptiePlataInvalida& e) {
+                    cout << "\n Eroare: " << e.what();
+                }
+            }
+            break;
+            case 5:
+                cout << "Multumim pentru vizita!\n"; break;
+            default:
+                cout << "Optiune invalida. Va rugam sa selectati o optiune valida.\n";
+            break;
+        }
+    } while (option != 5);
     return 0;
 }

@@ -4,7 +4,7 @@
 #include <string>
 #include <iomanip>
 #include <sstream>
-
+#include <exception>
 using namespace std;
 string obtineTimpCurent() {
     time_t acum = time(nullptr);
@@ -56,6 +56,16 @@ private:
 class ExceptieClientNeeligibil : public exception {
 public:
     explicit ExceptieClientNeeligibil(const string& mesaj) : mesaj_(mesaj) {}
+    const char* what() const noexcept override {
+        return mesaj_.c_str();
+    }
+
+private:
+    string mesaj_;
+};
+class ExceptieDiscountInvalid : public exception {
+public:
+    explicit ExceptieDiscountInvalid(const string& mesaj) : mesaj_(mesaj) {}
     const char* what() const noexcept override {
         return mesaj_.c_str();
     }
@@ -624,3 +634,4 @@ int main() {
     } while (option != 5);
     return 0;
 }
+
